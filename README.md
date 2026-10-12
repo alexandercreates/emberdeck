@@ -183,4 +183,4 @@ packages/
 
 ## License
 
-MIT
+MIT © [Alexander Frank-Puchta](https://alexandercreates.org)

@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Core engine of emberdeck: schemas, items, stages and Firebase Remote Config / Storage clients.",
   "license": "MIT",
+  "author": {
+    "name": "Alexander Frank-Puchta",
+    "url": "https://alexandercreates.org"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,7 +16,9 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -b"
   },

@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Manage Firebase Remote Config and Storage across stages with typed, customizable items — from a local dashboard or the CLI.",
   "license": "MIT",
+  "author": {
+    "name": "Alexander Frank-Puchta",
+    "url": "https://alexandercreates.org"
+  },
   "type": "module",
   "bin": {
     "emberdeck": "./dist/bin.js"
@@ -15,7 +19,9 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=22.18"
   },
@@ -26,7 +32,15 @@
   "dependencies": {
     "@emberdeck/core": "workspace:*"
   },
-  "keywords": ["firebase", "remote-config", "storage", "cms", "dashboard", "cli", "stages"],
+  "keywords": [
+    "firebase",
+    "remote-config",
+    "storage",
+    "cms",
+    "dashboard",
+    "cli",
+    "stages"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/alexandercreates/emberdeck.git",

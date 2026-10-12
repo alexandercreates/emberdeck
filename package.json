@@ -1,6 +1,10 @@
 {
   "name": "emberdeck-monorepo",
   "private": true,
+  "author": {
+    "name": "Alexander Frank-Puchta",
+    "url": "https://alexandercreates.org"
+  },
   "type": "module",
   "packageManager": "pnpm@10.28.0",
   "engines": {
