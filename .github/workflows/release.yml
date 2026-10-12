@@ -1,0 +1,163 @@
+name: Release
+
+# Triggered by pushing a version tag, e.g.:
+#   node scripts/set-version.mjs 0.2.0
+#   git commit -am "Release v0.2.0" && git tag v0.2.0 && git push --follow-tags
+#
+# Secrets:
+#   NPM_TOKEN           npm automation token with publish rights for `emberdeck` and `@emberdeck/*`
+#   HOMEBREW_TAP_TOKEN  fine-grained PAT with contents:write on alexandercreates/homebrew-tap
+# Both steps are skipped (with a warning) when their secret is missing.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/set-version.mjs --check "$GITHUB_REF_NAME"
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+
+  binaries:
+    needs: verify
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          # macOS binaries are built on macOS so they can be codesigned.
+          - os: macos-14
+            targets: darwin-arm64,darwin-x64
+            name: macos
+          - os: ubuntu-latest
+            targets: linux-x64,linux-arm64
+            name: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/build-binaries.mjs --targets "${{ matrix.targets }}"
+      - name: Smoke test native binary
+        if: matrix.name == 'linux'
+        run: |
+          tar -xzf dist-bin/emberdeck-*-linux-x64.tar.gz -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/emberdeck" --version | grep -qx "${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.name }}
+          path: dist-bin/*.tar.gz
+          if-no-files-found: error
+
+  github-release:
+    needs: binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binaries-*
+          path: dist-bin
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist-bin
+        run: sha256sum *.tar.gz | tee checksums.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: dist-bin/checksums.txt
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags="--generate-notes --verify-tag"
+          case "$GITHUB_REF_NAME" in *-*) flags="$flags --prerelease";; esac
+          gh release create "$GITHUB_REF_NAME" dist-bin/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" $flags
+
+  npm:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      NPM_CONFIG_PROVENANCE: "true"
+    steps:
+      - if: env.NODE_AUTH_TOKEN == ''
+        run: echo "::warning::NPM_TOKEN is not set — skipping npm publish."
+      - uses: actions/checkout@v4
+        if: env.NODE_AUTH_TOKEN != ''
+      - uses: pnpm/action-setup@v4
+        if: env.NODE_AUTH_TOKEN != ''
+      - uses: actions/setup-node@v4
+        if: env.NODE_AUTH_TOKEN != ''
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - if: env.NODE_AUTH_TOKEN != ''
+        run: pnpm install --no-frozen-lockfile && pnpm build
+      - name: Copy README and LICENSE into published packages
+        if: env.NODE_AUTH_TOKEN != ''
+        run: |
+          for p in packages/core packages/cli; do cp LICENSE "$p/"; done
+          cp README.md packages/cli/README.md
+      - name: Publish
+        if: env.NODE_AUTH_TOKEN != ''
+        run: |
+          tag=latest
+          case "$GITHUB_REF_NAME" in *-*) tag=next;; esac
+          pnpm -r --filter @emberdeck/core --filter emberdeck publish --access public --no-git-checks --tag "$tag"
+
+  homebrew:
+    needs: github-release
+    runs-on: ubuntu-latest
+    env:
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - if: env.TAP_TOKEN == ''
+        run: echo "::warning::HOMEBREW_TAP_TOKEN is not set — skipping Homebrew update."
+      - if: env.TAP_TOKEN != '' && contains(github.ref_name, '-')
+        run: echo "Prerelease — Homebrew formula is not updated."
+      - uses: actions/checkout@v4
+        if: env.TAP_TOKEN != '' && !contains(github.ref_name, '-')
+      - uses: actions/download-artifact@v4
+        if: env.TAP_TOKEN != '' && !contains(github.ref_name, '-')
+        with:
+          name: checksums
+          path: dist-bin
+      - uses: actions/checkout@v4
+        if: env.TAP_TOKEN != '' && !contains(github.ref_name, '-')
+        with:
+          repository: alexandercreates/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+      - name: Update formula
+        if: env.TAP_TOKEN != '' && !contains(github.ref_name, '-')
+        run: |
+          node scripts/render-formula.mjs --checksums dist-bin/checksums.txt --version "${GITHUB_REF_NAME#v}" --out tap/Formula/emberdeck.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/emberdeck.rb
+          git commit -m "emberdeck ${GITHUB_REF_NAME}"
+          git push

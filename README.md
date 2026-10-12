@@ -34,9 +34,12 @@ The Firebase console is great for one project and a handful of flat parameters. 
 npx emberdeck init
 npm install -D emberdeck   # optional, gives you config autocompletion
 
-# Homebrew (coming soon)
+# Homebrew (single binary, no Node.js needed)
 brew install alexandercreates/tap/emberdeck
 ```
+
+Prebuilt binaries for macOS and Linux are also attached to every
+[GitHub release](https://github.com/alexandercreates/emberdeck/releases).
 
 ## Quick start
 
@@ -155,8 +158,11 @@ await ws.promote({ from: "dev", to: "prod", type: "banner", ids: ["summer"] });
 pnpm install
 pnpm build            # core + cli (tsc) and the dashboard (vite)
 pnpm test             # unit + integration tests against an in-memory fake of the Google APIs
-pnpm dev:cli -- --help
+pnpm dev:cli --help
+pnpm build:binaries --targets linux-x64   # single-file binary, needs bun
 ```
+
+Releases are fully automated from version tags, see [docs/RELEASING.md](docs/RELEASING.md).
 
 Dashboard development: run `emberdeck studio --port 4321 --no-open` inside a project, then
 `pnpm dev:dashboard` and open `http://localhost:5173/#token=<token from the studio URL>`.
@@ -172,8 +178,8 @@ packages/
 
 ## Roadmap
 
-- [ ] Homebrew tap with a single-file binary (`bun build --compile`, dashboard embedded)
-- [ ] Release workflow (npm publish + GitHub releases)
+- [x] Single-file binaries with embedded dashboard, Homebrew tap, npm publishing ([docs/RELEASING.md](docs/RELEASING.md))
+- [ ] Windows binary
 - [ ] Remote Config version history and rollback in the dashboard
 - [ ] Conditional values editor
 - [ ] Credentials in the OS keychain

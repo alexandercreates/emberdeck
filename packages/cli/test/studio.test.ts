@@ -92,3 +92,30 @@ describe("studio server", () => {
     assert.match(await res.text(), /emberdeck studio/);
   });
 });
+
+describe("embedded dashboard assets", () => {
+  it("serves embedded files with SPA fallback", async () => {
+    const { embeddedAssets } = await import("../src/dashboard-assets.js");
+    const ws = new Workspace({
+      config: validateConfig({ stages: { dev: { projectId: "p", credentials: { type: "adc" } } } }),
+      path: "/virtual/emberdeck.config.json",
+      rootDir: "/virtual",
+    });
+    const server = await startStudio(ws, {
+      dashboard: embeddedAssets({
+        "index.html": Buffer.from("<h1>embedded</h1>").toString("base64"),
+        "assets/app.js": Buffer.from("console.log(1)").toString("base64"),
+      }),
+    });
+    try {
+      const origin = new URL(server.url).origin;
+      const js = await realFetch(`${origin}/assets/app.js`);
+      assert.equal(js.headers.get("content-type"), "text/javascript; charset=utf-8");
+      assert.equal(await js.text(), "console.log(1)");
+      assert.equal(await (await realFetch(`${origin}/some/route`)).text(), "<h1>embedded</h1>");
+      assert.equal(await (await realFetch(`${origin}/../../etc/passwd`)).text(), "<h1>embedded</h1>");
+    } finally {
+      await server.close();
+    }
+  });
+});

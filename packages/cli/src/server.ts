@@ -1,11 +1,8 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { existsSync } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { dirname, extname, join, normalize, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
 import { EmberdeckError, isEmberdeckError, type Workspace } from "@emberdeck/core";
+import { resolveDashboard, type DashboardAssets } from "./dashboard-assets.js";
 
 /**
  * Local API + dashboard server for `emberdeck studio`.
@@ -19,7 +16,10 @@ export interface StudioOptions {
   port?: number;
   host?: string;
   token?: string;
+  /** Serve the dashboard from this directory instead of the default lookup. */
   dashboardDir?: string;
+  /** Serve the dashboard from these assets (takes precedence over dashboardDir). */
+  dashboard?: DashboardAssets;
 }
 
 export interface StudioServer {
@@ -85,28 +85,6 @@ function statusFor(err: EmberdeckError): number {
   }
 }
 
-export function findDashboardDir(explicit?: string): string | undefined {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    explicit,
-    process.env.EMBERDECK_DASHBOARD_DIR,
-    join(here, "dashboard"), // bundled into dist/ for npm
-    join(here, "..", "..", "dashboard", "dist"), // monorepo development
-  ];
-  return candidates.find((p): p is string => !!p && existsSync(join(p, "index.html")));
-}
-
-const MIME: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".ico": "image/x-icon",
-  ".json": "application/json",
-  ".woff2": "font/woff2",
-};
-
 const FALLBACK_HTML = `<!doctype html><meta charset="utf-8"><title>emberdeck</title>
 <style>body{font:15px/1.5 system-ui;max-width:640px;margin:4rem auto;padding:0 1rem;color:#222}code{background:#f3f3f3;padding:2px 5px;border-radius:4px}</style>
 <h1>🔥 emberdeck studio</h1>
@@ -117,7 +95,7 @@ export async function startStudio(workspace: Workspace, options: StudioOptions =
   const host = options.host ?? "127.0.0.1";
   const token = options.token ?? randomBytes(24).toString("base64url");
   const tokenBuf = Buffer.from(token);
-  const dashboardDir = findDashboardDir(options.dashboardDir);
+  const dashboard = options.dashboard ?? resolveDashboard(options.dashboardDir);
   let port = options.port ?? 0;
 
   const stage = (ctx: Ctx) => workspace.stage(ctx.params.stage!);
@@ -244,23 +222,27 @@ export async function startStudio(workspace: Workspace, options: StudioOptions =
   }
 
   async function serveStatic(url: URL, res: ServerResponse): Promise<void> {
-    if (!dashboardDir) {
+    if (!dashboard) {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(FALLBACK_HTML);
       return;
     }
-    const root = resolve(dashboardDir);
-    let file = normalize(join(root, decodeURIComponent(url.pathname)));
-    if (!file.startsWith(root + sep) && file !== root) throw new HttpError(403, "Forbidden.");
-    const isFile = await stat(file).then((s) => s.isFile()).catch(() => false);
-    if (!isFile) file = join(root, "index.html"); // SPA fallback
+    const path = url.pathname === "/" ? "/index.html" : url.pathname;
+    // Unknown paths fall back to index.html (SPA routing).
+    const isIndex = !(await dashboard.get(path));
+    const file = await dashboard.get(isIndex ? "/index.html" : path);
+    if (!file) {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(FALLBACK_HTML);
+      return;
+    }
     res.writeHead(200, {
-      "content-type": MIME[extname(file)] ?? "application/octet-stream",
-      "cache-control": file.endsWith("index.html") ? "no-store" : "public, max-age=31536000, immutable",
+      "content-type": file.contentType,
+      "cache-control": isIndex || path === "/index.html" ? "no-store" : "public, max-age=31536000, immutable",
       "x-content-type-options": "nosniff",
       "referrer-policy": "no-referrer",
     });
-    res.end(await readFile(file));
+    res.end(file.data);
   }
 
   const server = createServer(async (req, res) => {

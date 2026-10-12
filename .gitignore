@@ -9,3 +9,7 @@ dist/
 *service-account*.json
 *-sa.json
 .emberdeck/credentials/
+
+# Release build output
+dist-bin/
+packages/cli/standalone/embedded-dashboard.gen.ts

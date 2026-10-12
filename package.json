@@ -16,7 +16,9 @@
     "test": "tsx --test packages/*/test/*.test.ts",
     "dev:cli": "tsx packages/cli/src/bin.ts",
     "dev:dashboard": "pnpm --filter @emberdeck/dashboard dev",
-    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo"
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo",
+    "build:binaries": "node scripts/build-binaries.mjs",
+    "version:set": "node scripts/set-version.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",
