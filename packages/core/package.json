@@ -1,0 +1,24 @@
+{
+  "name": "@emberdeck/core",
+  "version": "0.1.0",
+  "description": "Core engine of emberdeck: schemas, items, stages and Firebase Remote Config / Storage clients.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexandercreates/emberdeck.git",
+    "directory": "packages/core"
+  }
+}

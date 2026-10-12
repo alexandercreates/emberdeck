@@ -1,0 +1,22 @@
+{
+  "name": "emberdeck-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "tsc -b && pnpm --filter @emberdeck/dashboard build",
+    "typecheck": "tsc -b",
+    "test": "tsx --test packages/*/test/*.test.ts",
+    "dev:cli": "tsx packages/cli/src/bin.ts",
+    "dev:dashboard": "pnpm --filter @emberdeck/dashboard dev",
+    "clean": "rm -rf packages/*/dist packages/*/tsconfig.tsbuildinfo"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "emberdeck",
+  "version": "0.1.0",
+  "description": "Manage Firebase Remote Config and Storage across stages with typed, customizable items — from a local dashboard or the CLI.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "emberdeck": "./dist/bin.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "prepack": "node ./scripts/bundle-dashboard.mjs"
+  },
+  "dependencies": {
+    "@emberdeck/core": "workspace:*"
+  },
+  "keywords": ["firebase", "remote-config", "storage", "cms", "dashboard", "cli", "stages"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexandercreates/emberdeck.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/alexandercreates/emberdeck#readme"
+}
